@@ -18,25 +18,42 @@ let baseURLString = "https://ios-walkie-talkie-service-2889-dev.twil.io"
 let accessTokenEndpoint = "/token"
 let identity = "alice"
 let twimlParamTo = "roomID"
- 
+let testList = [ "hi", "hi2" ]
 let kRegistrationTTLInDays = 365
- 
+
+var someInts:[Int] = [10, 20, 30]
+
+
 let kCachedDeviceToken = "CachedDeviceToken"
 let kCachedBindingDate = "CachedBindingDate"
- 
-class ViewController: UIViewController {
+extension Array where Element: Comparable {
+    func containsSameElements(as other: [Element]) -> Bool {
+        return self.count == other.count && self.sorted() == other.sorted()
+    }
+}
+class ViewController: UIViewController, UITableViewDataSource, UITableViewDelegate {
+    
+    
+   
+    
  
     @IBOutlet weak var qualityWarningsToaster: UILabel!
     @IBOutlet weak var placeCallButton: UIButton!
     @IBOutlet weak var iconView: UIImageView!
+    @IBOutlet weak var participantTable : UITableViewController!
+    @IBOutlet weak var participantView: UITableView!
     @IBOutlet weak var outgoingValue: UITextField!
+    @IBOutlet weak var identityFieldValue: UITextField!
     @IBOutlet weak var callControlView: UIView!
     @IBOutlet weak var muteSwitch: UISwitch!
-    @IBOutlet weak var speakerSwitch: UISwitch!
+    
+    var speakerSwitch: Bool = true
  
     var incomingPushCompletionCallback: (() -> Void)?
  
     var isSpinning: Bool
+    var fetchUpdate: Bool = false
+    var partArray: Array<String> = ["Room Users"]
     var incomingAlertController: UIAlertController?
  
     var callKitCompletionCallback: ((Bool) -> Void)? = nil
@@ -72,12 +89,27 @@ class ViewController: UIViewController {
             provider.invalidate()
         }
     }
- 
+    
+   
+
+    
     override func viewDidLoad() {
         super.viewDidLoad()
- 
+        
+        
+        self.toggleAudioRoute(toSpeaker: true)
+          
         toggleUIState(isEnabled: true, showCallControl: false)
         outgoingValue.delegate = self
+        identityFieldValue.delegate = self
+        
+        participantView.backgroundColor = UIColor.white
+        participantView.dataSource = self
+        participantView.delegate = self
+        
+     
+        
+        
         
         /* Please note that the designated initializer `CXProviderConfiguration(localizedName: String)` has been deprecated on iOS 14. */
         let configuration = CXProviderConfiguration(localizedName: "Voice Quickstart")
@@ -95,10 +127,64 @@ class ViewController: UIViewController {
          */
         TwilioVoiceSDK.audioDevice = audioDevice
     }
+    
+    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
+        let cell = UITableViewCell()
+        cell.backgroundColor = UIColor.white
+        let label = UILabel(frame: CGRect(x:0, y:0, width:200, height:50))
+        
+        if indexPath.row > 0 {
+            let firstAttributes: [NSAttributedString.Key: Any] = [.foregroundColor: UIColor.green, .font:UIFont.systemFont(ofSize: 32)]
+            let secondAttributes: [NSAttributedString.Key: Any] = [.foregroundColor: UIColor.black, .font:UIFont.systemFont(ofSize: 24)]
+
+            let firstString = NSMutableAttributedString(string: "\u{2022} ", attributes: firstAttributes)
+            let secondString = NSAttributedString(string: self.partArray[indexPath.row], attributes: secondAttributes)
+            
+            firstString.append(secondString)
+            
+            
+        
+            label.attributedText = firstString
+    
+        }
+        else {
+            let paragraph = NSMutableParagraphStyle()
+            paragraph.alignment = .center
+            let firstAttributes: [NSAttributedString.Key: Any] = [.foregroundColor: UIColor.black, .font: UIFont.systemFont(ofSize: 32), .paragraphStyle: paragraph]
+            
+
+            let firstString = NSMutableAttributedString(string: "    " + self.partArray[indexPath.row], attributes: firstAttributes)
+            
+            label.attributedText = firstString
+        }
+        
+       
+
+       
+        
+        label.textAlignment = NSTextAlignment.center;
+        cell.addSubview(label)
+        
+        
+
+        return cell
+    }
+    
+    
+    
+    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
+        
+        return self.partArray.count
+      }
+
+    func tableView(tableView: UITableView, heightForRowAtIndexPath indexPath: NSIndexPath) -> CGFloat {
+          return 50
+      }
  
     func fetchAccessToken() -> String? {
-        let endpointWithIdentity = String(format: "%@?identity=%@", accessTokenEndpoint, identity)
-        
+        NSLog("Access token started")
+        let endpointWithIdentity = String(format: "%@?identity=%@", accessTokenEndpoint, self.identityFieldValue.text ?? "")
+        NSLog(String(format: "%@?identity=%@", accessTokenEndpoint, self.identityFieldValue.text ?? ""))
         guard let accessTokenURL = URL(string: baseURLString + endpointWithIdentity) else { return nil }
         
         return try? String(contentsOf: accessTokenURL, encoding: .utf8)
@@ -109,11 +195,54 @@ class ViewController: UIViewController {
         
         if showCallControl {
             callControlView.isHidden = false
+            participantView.isHidden = false
            // muteSwitch.isOn = false
-            speakerSwitch.isOn = true
+            speakerSwitch = true
         } else {
             callControlView.isHidden = true
+            participantView.isHidden = true
         }
+    }
+    
+    func partList(RoomID: String) {
+        
+        let functionURL =  "\("https://conferenceparticipants-8266.twil.io/ConfPart?confName=")\(RoomID)"
+        print(functionURL)
+        
+        if let url = URL(string: functionURL) {
+            let task = URLSession.shared.dataTask(with: url) {
+                data, response, error in
+                if error != nil {
+                    print(error!)
+                } else {
+                    if var responseString = String(data: data!, encoding: .utf8) {
+                        
+                        
+                        responseString = responseString.replacingOccurrences(of: "[", with: "", options: NSString.CompareOptions.literal, range: nil)
+                        responseString = responseString.replacingOccurrences(of: "]", with: "", options: NSString.CompareOptions.literal, range: nil)
+                        responseString = responseString.replacingOccurrences(of: "\"", with: "", options: NSString.CompareOptions.literal, range: nil)
+                        
+                        
+                        var myStringArr = responseString.components(separatedBy: ",")
+                        myStringArr.insert("Room Users", at: 0)
+                        if myStringArr.containsSameElements(as: self.partArray) {
+                            print("same, do nothing")
+                        }
+                        
+                        else {
+                            self.partArray = Array(self.partArray.prefix(1))
+                            self.partArray =  myStringArr
+                            print(self.partArray)
+                            
+                        }
+                       
+                    }
+                }
+            }
+            task.resume()
+        }
+        
+      
     }
  
     func showMicrophoneAccessRequest(_ uuid: UUID, _ handle: String) {
@@ -156,6 +285,7 @@ class ViewController: UIViewController {
             
             guard !permissionGranted else {
                 self?.performStartCallAction(uuid: uuid, handle: handle)
+                self?.partArray.append(self?.identityFieldValue.text ?? "")
                 return
             }
         
@@ -186,6 +316,7 @@ class ViewController: UIViewController {
         // The sample app supports toggling mute from app UI only on the last connected call.
         guard let activeCall = activeCall else { return }
         
+        
         activeCall.isMuted = sender.isOn
     }
     
@@ -211,12 +342,30 @@ class ViewController: UIViewController {
         guard let activeCall = activeCall else { return }
         //reset image tint
         iconView.image! = iconView.image!.withRenderingMode(.alwaysOriginal)
+        self.playSound()
+        usleep(200000)
         activeCall.isMuted = true
         NSLog("MUTED")
+        
+        
+    }
+    var walkie: AVAudioPlayer?
+    func playSound() {
+        
+        let url = URL(fileURLWithPath: Bundle.main.path(forResource: "walkie", ofType: "wav")!)
+        
+
+        do {
+            walkie = try AVAudioPlayer(contentsOf: url)
+            walkie?.volume = 1.0
+            walkie?.play()
+        } catch {
+            print("couldn't load file")
+        }
     }
     
     @IBAction func speakerSwitchToggled(_ sender: UISwitch) {
-        toggleAudioRoute(toSpeaker: sender.isOn)
+        toggleAudioRoute(toSpeaker: speakerSwitch)
     }
     
     
@@ -254,17 +403,16 @@ class ViewController: UIViewController {
     func stopSpin() {
         //rotate back to original position
        isSpinning = false
-        NSLog("View About to be reset")
-            if let iconView = iconView {
-                iconView.transform = iconView.transform.rotated(by: CGFloat(Double.pi*4))
-            }
+        NSLog("View About to be rotated")
+          
         
     }
     
     func spin(options: UIViewAnimationOptions) {
-        UIView.animate(withDuration: 0.5, delay: 0.0, options: options, animations: { [weak iconView] in
+        UIView.animate(withDuration: 1, delay: 0.0, options: options, animations: { [weak iconView] in
             if let iconView = iconView {
-                iconView.transform = iconView.transform.rotated(by: CGFloat(Double.pi/2))
+                iconView.transform = iconView.transform.rotated(by: .pi)
+                iconView.transform = iconView.transform.rotated(by: .pi)
             }
         }) { [weak self] finished in
             guard let strongSelf = self else { return }
@@ -286,6 +434,7 @@ class ViewController: UIViewController {
 extension ViewController: UITextFieldDelegate {
     func textFieldShouldReturn(_ textField: UITextField) -> Bool {
         outgoingValue.resignFirstResponder()
+        identityFieldValue.resignFirstResponder()
         return true
     }
 }
@@ -454,7 +603,8 @@ extension ViewController: CallDelegate {
     
     func callDidConnect(call: Call) {
         NSLog("callDidConnect:")
-        
+        NSLog("Sid3")
+        NSLog(call.sid)
         if playCustomRingback {
             stopRingback()
         }
@@ -466,7 +616,7 @@ extension ViewController: CallDelegate {
         placeCallButton.setTitle("Leave", for: .normal)
         
         toggleUIState(isEnabled: true, showCallControl: true)
-        stopSpin()
+        
         toggleAudioRoute(toSpeaker: true)
     }
     
@@ -504,6 +654,7 @@ extension ViewController: CallDelegate {
         if let error = error {
             NSLog("Call failed: \(error.localizedDescription)")
         } else {
+            self.fetchUpdate = false
             NSLog("Call disconnected")
         }
         
@@ -535,7 +686,7 @@ extension ViewController: CallDelegate {
             stopRingback()
         }
         
-        stopSpin()
+        
         toggleUIState(isEnabled: true, showCallControl: false)
         placeCallButton.setTitle("Join", for: .normal)
     }
@@ -631,11 +782,14 @@ extension ViewController: CallDelegate {
         ringtonePlayer.stop()
     }
 }
+
+
  
  
 // MARK: - CXProviderDelegate
  
 extension ViewController: CXProviderDelegate {
+    
     func providerDidReset(_ provider: CXProvider) {
         NSLog("providerDidReset:")
         audioDevice.isEnabled = false
@@ -670,8 +824,29 @@ extension ViewController: CXProviderDelegate {
         performVoiceCall(uuid: action.callUUID, client: "") { success in
             if success {
                 self.stopSpin()
-                NSLog("performVoiceCall() successful")
                 provider.reportOutgoingCall(with: action.callUUID, connectedAt: Date())
+                
+                
+                self.fetchUpdate = true
+                
+            
+                var tempRoomID = self.outgoingValue.text ?? ""
+                //start dynamically updating data
+                DispatchQueue.global(qos: .background).async {
+                    while self.fetchUpdate == true {
+                    self.updatePart(RoomID: tempRoomID)
+
+                    DispatchQueue.main.async {
+                        self.participantView.reloadData()
+                    }}
+                }
+                
+                self.participantView.reloadData()
+                
+             //  dispatch_async(dispatch_get_main_queue()) {
+                 //          self.participantView.reloadData()
+               //        }
+                NSLog("performVoiceCall() Success")
             } else {
                 self.stopSpin()
                 NSLog("performVoiceCall() failed")
@@ -679,6 +854,16 @@ extension ViewController: CXProviderDelegate {
         }
         
         action.fulfill()
+    }
+    
+    func updatePart(RoomID: String) {
+        
+        self.partList(RoomID: RoomID)
+        sleep(2)
+        
+    
+        
+        
     }
  
     func provider(_ provider: CXProvider, perform action: CXAnswerCallAction) {
@@ -815,9 +1000,13 @@ extension ViewController: CXProviderDelegate {
             builder.uuid = uuid
         }
         
+        
         let call = TwilioVoiceSDK.connect(options: connectOptions, delegate: self)
+        NSLog(call.sid)
         call.isMuted = true
         activeCall = call
+        NSLog("UUID:")
+        NSLog(call.uuid!.uuidString)
         activeCalls[call.uuid!.uuidString] = call
         callKitCompletionCallback = completionHandler
     }
