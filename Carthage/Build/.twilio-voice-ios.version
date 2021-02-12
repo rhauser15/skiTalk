@@ -1,0 +1,19 @@
+{
+  "Mac" : [
+
+  ],
+  "watchOS" : [
+
+  ],
+  "tvOS" : [
+
+  ],
+  "commitish" : "6.1.0",
+  "iOS" : [
+    {
+      "name" : "TwilioVoice",
+      "hash" : "fca81988b552ee90ae5fce75e162207ad5bbf13fd083a41913cb2e77cdd0239e",
+      "linking" : "dynamic"
+    }
+  ]
+}
