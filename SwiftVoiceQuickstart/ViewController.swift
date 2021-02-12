@@ -343,7 +343,7 @@ class ViewController: UIViewController, UITableViewDataSource, UITableViewDelega
         //reset image tint
         iconView.image! = iconView.image!.withRenderingMode(.alwaysOriginal)
         self.playSound()
-        usleep(200000)
+        usleep(400000)
         activeCall.isMuted = true
         NSLog("MUTED")
         
